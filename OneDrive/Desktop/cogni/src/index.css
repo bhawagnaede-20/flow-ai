@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-navy-950 text-slate-200 font-sans antialiased;
+    background-image:
+      radial-gradient(1100px 500px at 85% -10%, rgba(56, 189, 248, 0.09), transparent 60%),
+      radial-gradient(900px 480px at -10% 10%, rgba(99, 102, 241, 0.08), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-navy-700 rounded-full border-2 border-transparent bg-clip-padding;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-navy-600;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/[0.06] bg-navy-900/80 shadow-panel backdrop-blur;
+  }
+
+  .panel-title {
+    @apply text-sm font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
+  }
+}
+
+/* Leaflet container inherits the dark theme */
+.leaflet-container {
+  @apply h-full w-full rounded-2xl bg-navy-950;
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  @apply bg-navy-900 text-slate-200;
+  box-shadow: 0 10px 30px -12px rgba(2, 6, 23, 0.9);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.leaflet-bar a {
+  @apply bg-navy-800 text-slate-200 border-navy-700;
+}
+.leaflet-bar a:hover {
+  @apply bg-navy-700 text-white;
+}
+
+.leaflet-control-attribution {
+  @apply bg-navy-950/70 text-[10px] text-slate-500;
+}
+.leaflet-control-attribution a {
+  @apply text-slate-400;
+}
