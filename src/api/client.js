@@ -2,7 +2,8 @@
  * FLOW AI — reusable API client for the Flask backend.
  *
  * - Single fetch wrapper used by every helper in ./endpoints.js.
- * - Base URL comes from VITE_API_BASE_URL and defaults to http://localhost:5000.
+ * - Base URL comes from VITE_API_BASE_URL. Local development defaults to localhost;
+ *   production fails clearly when the deployment URL has not been configured.
  * - Every failure is thrown as a typed ApiError so callers can distinguish
  *   network failures, timeouts, HTTP errors and malformed payloads.
  *
@@ -18,8 +19,15 @@ export function getApiBaseUrl() {
     typeof import.meta !== 'undefined' && import.meta.env
       ? import.meta.env.VITE_API_BASE_URL
       : undefined;
+  // Do not silently ship a production build that calls each visitor's localhost.
+  const isProductionBuild =
+    typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD === true;
   const base =
-    typeof fromEnv === 'string' && fromEnv.trim() !== '' ? fromEnv.trim() : DEFAULT_BASE_URL;
+    typeof fromEnv === 'string' && fromEnv.trim() !== ''
+      ? fromEnv.trim()
+      : isProductionBuild
+        ? ''
+        : DEFAULT_BASE_URL;
   return base.replace(/\/+$/, '');
 }
 
@@ -31,6 +39,7 @@ export const ERROR_KINDS = {
   INVALID_JSON: 'invalid-json', // body was not parseable JSON
   INVALID_RESPONSE: 'invalid-response', // 2xx but payload does not match the envelope/contract
   SERVER: 'server', // 2xx but the envelope said ok:false
+  CONFIGURATION: 'configuration', // production API URL is not configured
 };
 
 export class ApiError extends Error {
@@ -63,8 +72,15 @@ const DEFAULT_TIMEOUT_MS = 10000;
  * @throws {ApiError} on network/timeout/HTTP/shape failures
  */
 export async function apiRequest(path, { method = 'GET', body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-  const url = `${getApiBaseUrl()}${path}`;
+  const baseUrl = getApiBaseUrl();
   const endpoint = `${method} ${path}`;
+  if (!baseUrl) {
+    throw new ApiError(
+      'FLOW AI backend URL is not configured. Set VITE_API_BASE_URL in your Netlify site environment variables, then redeploy.',
+      { kind: ERROR_KINDS.CONFIGURATION, endpoint },
+    );
+  }
+  const url = `${baseUrl}${path}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

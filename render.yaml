@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: flow-ai-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: waitress-serve --listen=0.0.0.0:$PORT app:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: FLOW_AI_ALLOWED_ORIGINS
+        value: https://keen-mandazi-418c3b.netlify.app

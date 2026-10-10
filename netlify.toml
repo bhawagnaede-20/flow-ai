@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Support direct navigation and browser refreshes in this React single-page app.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
