@@ -12,7 +12,8 @@ model yet — the goal is a dependable API contract first.
 ## Stack
 
 - Python 3.12+
-- Flask, flask-cors (development CORS for `http://localhost:5173`)
+- Flask, flask-cors (environment-based restrictive CORS)
+- waitress (production WSGI server)
 - pytest for the test suite
 - scikit-learn is intentionally **not** installed yet; predictions use a
   deterministic heuristic until a real model is introduced
@@ -229,10 +230,101 @@ computed mission routes):
 - Predictions reuse the same deterministic wave/pressure math with
   `model_trained: false`; no sklearn model is fitted yet.
 
-## Development CORS
+## Environment variables (placeholders only — see `backend/.env.example`)
 
-Allowed origins: `http://localhost:5173` and `http://127.0.0.1:5173`
-(Vite dev server) for `GET`, `POST`, `PATCH`, `OPTIONS` on `/api/*`.
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `FLOW_AI_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated exact origins allowed by CORS. Set this in production to your real frontend origin(s). Non-http(s) values crash at startup (fail fast) instead of silently weakening CORS. |
+| `FLOW_AI_HOST` | `127.0.0.1` | Bind address for `python backend/app.py`. Set `0.0.0.0` only when the platform requires external binding. |
+| `FLOW_AI_PORT` | `5000` | Port for `python backend/app.py`; takes precedence over `PORT`. |
+| `PORT` | *(unset)* | Standard port injected by hosting platforms; used when `FLOW_AI_ALLOWED_ORIGINS`-sibling `FLOW_AI_PORT` is unset. |
+
+This service has **no secrets of its own**. Never commit a real `.env` file or
+credentials — `.env` is gitignored; only the placeholder-only `.env.example`
+is tracked.
+
+## CORS (restrictive, environment-based)
+
+Only the exact origins in `FLOW_AI_ALLOWED_ORIGINS` receive CORS grants, for
+`GET`, `POST`, `PATCH`, `OPTIONS` on `/api/*`.
+
+- **Local development (default):** the Vite dev server on
+  `http://localhost:5173` / `http://127.0.0.1:5173`.
+- **Production:** set `FLOW_AI_ALLOWED_ORIGINS=https://your-frontend.example.com`
+  (comma-separate multiple origins). Other origins receive the JSON response
+  but **no** `Access-Control-Allow-Origin` header, so browsers block them.
+- A malformed value (e.g. a bare domain) raises `ValueError` at startup.
+
+## Health check
+
+`GET /api/health` returns HTTP 200 with the simulation clock/step and is a
+suitable platform health/readiness probe:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "status": "healthy",
+    "service": "flow-ai-backend",
+    "api_version": "1.0",
+    "simulation": { "step": 0, "clock": "08:00:00", "running": true },
+    "notice": "All values returned by this API are simulated…"
+  },
+  "meta": { "simulated": true, "api_version": "1.0", "notice": "…" }
+}
+```
+
+## Production deployment (WSGI via waitress)
+
+`waitress` is included in `requirements.txt` as the production WSGI server
+(multi-threaded, pure Python, no native dependencies). From the repository
+root:
+
+```bash
+pip install -r backend/requirements.txt
+waitress-serve --host=0.0.0.0 --port="${PORT:-5000}" backend.app:app
+```
+
+Or, equivalently, from `backend/` (module:app form used and verified locally):
+
+```bash
+cd backend
+FLOW_AI_ALLOWED_ORIGINS=https://your-frontend.example.com waitress-serve --host=0.0.0.0 --port=${PORT:-5000} app:app
+```
+
+Generic platform steps (Render / Railway / Fly / Heroku-style):
+
+1. **Build command:** `pip install -r backend/requirements.txt`
+2. **Start command:** `waitress-serve --host=0.0.0.0 --port=$PORT backend.app:app` (run from the repository root)
+3. **Health check path:** `GET /api/health`
+4. **Environment:** set `FLOW_AI_ALLOWED_ORIGINS` to your deployed frontend
+   origin. `PORT` is injected by the platform automatically.
+5. `python backend/app.py` remains a safe local fallback (binds
+   `127.0.0.1:5000` by default).
+
+> ⚠️ **State is in-memory and resets on every restart.** Roads, incidents,
+> missions and the simulation clock live in the `STATE` dict inside `app.py`.
+> There is no database and no persistence; a redeploy or crash wipes all
+> created records back to the deterministic seed dataset.
+
+> ⚠️ **All traffic/emergency features are simulated.** Predictions are a
+> deterministic heuristic (`model_trained: false`), routing is Dijkstra over a
+> synthetic network, and no real ambulance dispatch or traffic-signal control
+> is performed. Do not present this as a real traffic-control system.
+
+### Frontend integration quick-start
+
+```bash
+# terminal 1 — API on :5000
+cd backend && python app.py
+
+# terminal 2 — Vite on :5173 (default CORS already allows it)
+npm run dev
+```
+
+Point the frontend at the API with `VITE_API_BASE_URL=http://localhost:5000`
+(see the repo-root `.env.example`). The frontend's
+`npm run test:integration` script exercises these endpoints.
 
 ## Frontend ownership
 

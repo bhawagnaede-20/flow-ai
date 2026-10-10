@@ -51,8 +51,40 @@ SIMULATION_NOTICE = (
     "response."
 )
 
-# Development frontend origins allowed by CORS.
-CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# CORS: restrictive and environment-based.
+# FLOW_AI_ALLOWED_ORIGINS is a comma-separated list of exact origins, e.g.
+#   FLOW_AI_ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
+# When unset (local development) only the Vite dev server on port 5173 is
+# allowed. A malformed value fails fast at startup instead of silently
+# loosening or breaking CORS.
+DEFAULT_ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+
+def parse_allowed_origins(raw):
+    """Parse a comma-separated origin list into a de-duplicated tuple.
+
+    Raises ValueError for entries that are not http(s) origins so that a
+    misconfigured deployment crashes at startup rather than serving
+    permissive or broken CORS.
+    """
+    if raw is None or not raw.strip():
+        raw = DEFAULT_ALLOWED_ORIGINS
+    origins = []
+    for item in raw.split(","):
+        item = item.strip().rstrip("/")
+        if not item:
+            continue
+        if not item.startswith(("http://", "https://")):
+            raise ValueError(
+                f"Invalid CORS origin {item!r} in FLOW_AI_ALLOWED_ORIGINS: "
+                "must start with http:// or https://"
+            )
+        if item not in origins:
+            origins.append(item)
+    return tuple(origins) or tuple(DEFAULT_ALLOWED_ORIGINS.split(","))
+
+
+CORS_ORIGINS = parse_allowed_origins(os.environ.get("FLOW_AI_ALLOWED_ORIGINS"))
 
 # Bounding box of the simulated operating area (Hyderabad, India).
 LAT_RANGE = (17.25, 17.56)
@@ -1680,6 +1712,11 @@ def handle_internal_error(_error_obj):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Safe local defaults (127.0.0.1:5000). Hosting platforms inject PORT;
+    # FLOW_AI_PORT / FLOW_AI_HOST override either. Use 0.0.0.0 as
+    # FLOW_AI_HOST only when the platform requires external binding.
     host = os.environ.get("FLOW_AI_HOST", "127.0.0.1")
-    port = int(os.environ.get("FLOW_AI_PORT", DEFAULT_PORT))
+    port = int(
+        os.environ.get("FLOW_AI_PORT") or os.environ.get("PORT") or DEFAULT_PORT
+    )
     app.run(host=host, port=port, debug=False)

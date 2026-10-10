@@ -72,6 +72,47 @@ def test_cors_allows_local_frontend(client):
     assert response.headers.get("Access-Control-Allow-Origin") == origin
 
 
+def test_cors_disallowed_origin_gets_no_cors_header(client):
+    """A foreign origin still gets a normal response, but no CORS grant."""
+    response = client.get("/api/roads", headers={"Origin": "https://evil.example.com"})
+    assert response.status_code == 200
+    assert response.headers.get("Access-Control-Allow-Origin") is None
+
+
+# ---------------------------------------------------------------------------
+# CORS origin parsing (environment-based configuration)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_allowed_origins_defaults_when_unset():
+    from app import DEFAULT_ALLOWED_ORIGINS, parse_allowed_origins
+
+    assert parse_allowed_origins(None) == tuple(DEFAULT_ALLOWED_ORIGINS.split(","))
+    assert parse_allowed_origins("") == tuple(DEFAULT_ALLOWED_ORIGINS.split(","))
+    assert parse_allowed_origins("   ") == tuple(DEFAULT_ALLOWED_ORIGINS.split(","))
+
+
+def test_parse_allowed_origins_parses_dedupes_and_strips():
+    from app import parse_allowed_origins
+
+    raw = " https://a.example.com ,https://b.example.com/,https://a.example.com,"
+    assert parse_allowed_origins(raw) == (
+        "https://a.example.com",
+        "https://b.example.com",
+    )
+
+
+def test_parse_allowed_origins_rejects_non_http_values():
+    import pytest as _pytest
+
+    from app import parse_allowed_origins
+
+    with _pytest.raises(ValueError):
+        parse_allowed_origins("example.com")
+    with _pytest.raises(ValueError):
+        parse_allowed_origins("ftp://files.example.com")
+
+
 def test_cors_preflight_for_post(client):
     response = client.open(
         "/api/incidents",
