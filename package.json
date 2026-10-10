@@ -8,7 +8,8 @@
     "dev": "vite",
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:integration": "node scripts/integration.test.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
