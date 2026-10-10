@@ -24,3 +24,5 @@ node_modules_broken/
 # Editor / OS junk
 Thumbs.db
 *.swp
+
+.freebuff/
